@@ -1,16 +1,25 @@
+import os
+
+from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, FewShotChatMessagePromptTemplate
 from langchain.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_openai import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_chroma import Chroma
 
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from config import answer_examples
+
+# 로컬 실행을 위한 모델/스토어 설정
+LLM_MODEL = os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:7b")
+EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "bge-m3")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+CHROMA_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
+COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "tax-index")
 
 store = {}
 
@@ -21,17 +30,38 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
     return store[session_id]
 
 
+def _seed_documents() -> list[Document]:
+    # 데이터 파일이 없을 때 사용하는 임시 시드: config.answer_examples 활용
+    docs: list[Document] = []
+    for ex in answer_examples:
+        content = f"질문: {ex['input']}\n답변: {ex['answer']}"
+        docs.append(Document(page_content=content, metadata={"source": "seed:answer_examples"}))
+    return docs
+
+
 def get_retriever():
-    embedding = OpenAIEmbeddings(model='text-embedding-3-large')
-    index_name = 'tax-markdown-index'
-    database = PineconeVectorStore.from_existing_index(index_name=index_name, embedding=embedding)
+    embedding = OllamaEmbeddings(model=EMBEDDING_MODEL, base_url=OLLAMA_BASE_URL)
+    database = Chroma(
+        collection_name=COLLECTION_NAME,
+        embedding_function=embedding,
+        persist_directory=CHROMA_DIR,
+    )
+    # 컬렉션이 비어 있으면 시드 데이터 색인 (최초 1회)
+    try:
+        count = database._collection.count()
+    except Exception:
+        count = 0
+    if count == 0:
+        database.add_documents(_seed_documents())
+
     retriever = database.as_retriever(search_kwargs={'k': 4})
     return retriever
+
 
 def get_history_retriever():
     llm = get_llm()
     retriever = get_retriever()
-    
+
     contextualize_q_system_prompt = (
         "Given a chat history and the latest user question "
         "which might reference context in the chat history, "
@@ -47,15 +77,15 @@ def get_history_retriever():
             ("human", "{input}"),
         ]
     )
-    
+
     history_aware_retriever = create_history_aware_retriever(
         llm, retriever, contextualize_q_prompt
     )
     return history_aware_retriever
 
 
-def get_llm(model='gpt-4o'):
-    llm = ChatOpenAI(model=model)
+def get_llm(model: str | None = None):
+    llm = ChatOllama(model=model or LLM_MODEL, base_url=OLLAMA_BASE_URL, temperature=0)
     return llm
 
 

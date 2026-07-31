@@ -1,2 +1,47 @@
+# Secrets and local configuration
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local editor and shell artifacts
+.history/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Local RAG indexes and model artifacts
+chroma_db/
+*.sqlite3
+*.bin
+*.onnx
+
+# Reproducible generated datasets
+data/processed/
+data/evaluation/results/
+
+# Superseded source document variants
+tax_with_markdown.docx
+tax_with_table.docx
