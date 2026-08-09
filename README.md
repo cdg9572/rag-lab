@@ -34,12 +34,29 @@ This repository contains a project that utilizes LangChain and Streamlit to buil
 
 ## Usage
 
-1. Run the Streamlit application:
+1. Prepare the local Ollama models:
+    ```sh
+    ollama pull qwen2.5:7b
+    ollama pull snowflake-arctic-embed2
+    ```
+
+2. Parse and index the source document:
+    ```sh
+    python scripts/ingest.py
+    python scripts/index.py
+    ```
+
+3. Optionally inspect vector-search results:
+    ```sh
+    python scripts/search.py "소득세 과세기간은?"
+    ```
+
+4. Run the Streamlit application:
     ```sh
     streamlit run chat.py
     ```
 
-2. Open your web browser and navigate to the displayed local URL to interact with the application.
+5. Open your web browser and navigate to the displayed local URL to interact with the application.
 
 ## Project Structure
 
